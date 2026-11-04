@@ -1,0 +1,3 @@
+# Place compose.yaml and .env in /opt/bw2kbdx.
+# flock prevents overlap; a previous backup must finish before the next starts.
+0 3 * * * cd /opt/bw2kbdx && /usr/bin/flock -n backup.lock /usr/bin/docker compose run --rm --no-deps backup >>backup.log 2>&1

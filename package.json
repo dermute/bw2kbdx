@@ -1,0 +1,14 @@
+{
+  "name": "bw2kbdx",
+  "version": "0.1.0",
+  "description": "One-shot Bitwarden and Vaultwarden personal-vault backups using KeePassXC CLI",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22.18.0" },
+  "scripts": {
+    "start": "node src/main.ts",
+    "test": "node --test test/*.test.ts",
+    "test:integration": "REQUIRE_KEEPASSXC=1 node --test test/keepassxc.test.ts"
+  }
+}

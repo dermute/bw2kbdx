@@ -1,0 +1,11 @@
+.git
+.agents
+.aws
+.codex
+node_modules
+backups
+secrets
+.env
+*.kdbx
+*.log
+*.bundle

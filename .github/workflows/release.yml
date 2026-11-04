@@ -1,0 +1,109 @@
+name: Release
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  source:
+    name: Publish corresponding source
+    needs: checks
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Collect corresponding source
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: sources
+          outputs: type=local,dest=release-source
+          cache-from: |
+            type=gha,scope=amd64
+            type=gha,scope=sources
+          cache-to: type=gha,mode=max,scope=sources
+      - name: Verify and archive source with build instructions
+        run: |
+          (cd release-source/sources && sha256sum -c SHA256SUMS)
+          tar -czf corresponding-source.tar.gz -C release-source .
+          sha256sum corresponding-source.tar.gz > corresponding-source.tar.gz.sha256
+      - name: Publish source before distributing the image
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" corresponding-source.tar.gz corresponding-source.tar.gz.sha256 --clobber
+
+  image:
+    name: Publish Ubuntu 26.04 image
+    needs: source
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check version matches tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          assert os.environ['RELEASE_TAG'] == 'v' + json.load(open('package.json'))['version']
+          PY
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            REVISION=${{ github.sha }}
+          sbom: true
+          provenance: mode=max
+          cache-from: |
+            type=gha,scope=amd64
+            type=gha,scope=arm64
+      - name: Verify anonymous image access
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          docker logout ghcr.io
+          for attempt in $(seq 1 40); do
+            if docker buildx imagetools inspect "$IMAGE:$VERSION" > image-manifest.txt 2>&1; then
+              cat image-manifest.txt
+              exit 0
+            fi
+            printf 'Waiting for public GHCR access (%s/40)\n' "$attempt"
+            sleep 15
+          done
+          cat image-manifest.txt
+          exit 1

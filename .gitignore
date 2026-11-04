@@ -1,0 +1,10 @@
+node_modules/
+coverage/
+backups/
+secrets/
+.env
+*.kdbx
+*.kdbx.*
+*.log
+__pycache__/
+*.bundle

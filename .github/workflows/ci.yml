@@ -1,0 +1,117 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Unit tests (Node.js 24)
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.22.2
+      - run: npm ci --ignore-scripts
+      - run: npm test
+
+  containers:
+    name: Container tests (Ubuntu 26.04, ${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            arch: amd64
+          - runner: ubuntu-26.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: test
+          load: true
+          tags: bw2kbdx:test
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+      - name: Unit and real KeePassXC tests inside the container
+        run: docker run --rm --read-only --tmpfs /tmp:rw,nosuid,nodev,size=512m bw2kbdx:test
+      - name: Verify with an independent KDBX reader
+        run: |
+          docker run --rm --read-only --tmpfs /tmp:rw,nosuid,nodev,size=512m \
+            -e ARTIFACT_DIR=/tmp/interop --entrypoint /bin/sh bw2kbdx:test -ec '
+              node --test test/keepassxc.test.ts
+              /opt/verify/bin/python test/independent-reader.py /tmp/interop
+            '
+      - name: Start disposable Vaultwarden
+        run: |
+          mkdir -p "$RUNNER_TEMP/bw2kbdx-tls"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout "$RUNNER_TEMP/bw2kbdx-tls/key.pem" \
+            -out "$RUNNER_TEMP/bw2kbdx-tls/cert.pem" \
+            -subj /CN=vaultwarden \
+            -addext subjectAltName=DNS:vaultwarden,IP:127.0.0.1 \
+            -addext basicConstraints=critical,CA:TRUE
+          # Disposable test certificate/key must be readable by the server user.
+          chmod 755 "$RUNNER_TEMP/bw2kbdx-tls"
+          chmod 644 "$RUNNER_TEMP/bw2kbdx-tls/"*.pem
+          docker network create bw2kbdx-ci
+          docker run -d --name vaultwarden --network bw2kbdx-ci \
+            -e SIGNUPS_ALLOWED=true -e DOMAIN=https://vaultwarden \
+            -e ROCKET_PORT=443 -e 'ROCKET_TLS={certs="/tls/cert.pem",key="/tls/key.pem"}' \
+            -v "$RUNNER_TEMP/bw2kbdx-tls:/tls:ro" \
+            -e I_REALLY_WANT_VOLATILE_STORAGE=true \
+            vaultwarden/server:1.37.5
+          for attempt in $(seq 1 60); do
+            if docker exec vaultwarden curl --cacert /tls/cert.pem -fsS https://vaultwarden/alive; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - name: Back up seeded Vaultwarden with real Bitwarden and KeePassXC CLIs
+        run: |
+          docker run --rm --network bw2kbdx-ci --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,size=512m \
+            -e BW2KBDX_DISPOSABLE_TEST=1 -e TEST_VAULTWARDEN_URL=https://vaultwarden \
+            -v "$RUNNER_TEMP/bw2kbdx-tls/cert.pem:/test-ca.pem:ro" \
+            -e NODE_EXTRA_CA_CERTS=/test-ca.pem -e SSL_CERT_FILE=/test-ca.pem \
+            --entrypoint node bw2kbdx:test test/vaultwarden.ts
+      - name: Stop disposable server
+        if: always()
+        run: |
+          docker rm -f vaultwarden || true
+          docker network rm bw2kbdx-ci || true
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          load: true
+          tags: bw2kbdx:runtime
+          cache-from: type=gha,scope=${{ matrix.arch }}
+      - name: Smoke test and record image size
+        run: |
+          docker run --rm --entrypoint /bin/sh bw2kbdx:runtime -ec '
+            . /etc/os-release
+            test "$ID" = ubuntu
+            test "$VERSION_ID" = 26.04
+            test "$(id -u)" -ne 0
+            test "$(node -p process.versions.node | cut -d. -f1)" = 24
+            node --version
+          '
+          docker run --rm --entrypoint bw bw2kbdx:runtime --version
+          docker run --rm --entrypoint keepassxc-cli bw2kbdx:runtime --version
+          docker image inspect bw2kbdx:runtime --format '{{.Size}}' > image-size-${{ matrix.arch }}.txt
+          printf 'Uncompressed runtime size (%s): %s bytes\n' '${{ matrix.arch }}' "$(cat image-size-${{ matrix.arch }}.txt)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-size-${{ matrix.arch }}
+          path: image-size-${{ matrix.arch }}.txt

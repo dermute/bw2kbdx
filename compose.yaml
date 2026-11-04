@@ -1,0 +1,15 @@
+services:
+  backup:
+    image: ghcr.io/dermute/bw2kbdx:0.1.0
+    restart: "no"
+    user: "${BACKUP_UID:-1000}:${BACKUP_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=512m,mode=1777
+    volumes:
+      - ./backups:/backups
+    env_file: .env
+    stop_grace_period: 30s

@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up a Bitwarden personal vault to KeePass KDBX
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/bw2kbdx
+ExecStart=/usr/bin/docker compose run --rm --no-deps backup
+TimeoutStartSec=1h
