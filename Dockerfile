@@ -58,7 +58,8 @@ RUN case "$TARGETARCH" in \
     && tar -xzf /sources/bitwarden-clients.tar.gz --wildcards --strip-components=1 -C /runtime/usr/share/bw2kbdx/bitwarden '*/LICENSE*.txt' \
     && sha256sum /sources/* > /sources/SHA256SUMS
 
-# Keep the source archive outside the runtime layers; publish it with every release.
+# Optional local source export for inspecting upstream build inputs.
+# GitHub Releases use the project's own source archives and link to the image.
 FROM bitwarden-build AS source-build
 COPY scripts/collect-sources.sh /build/collect-sources.sh
 RUN sh /build/collect-sources.sh

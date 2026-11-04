@@ -11,7 +11,7 @@ publication use Ubuntu 26.04 runner hosts; the image itself also uses Ubuntu
   cancellation, and retention of the previous backup after failure.
 - Deployment and workflow YAML parses successfully. Shell scripts and the
   independent Python reader pass syntax checks.
-- Native ARM64 production, test, and corresponding-source container targets
+- Native ARM64 production, test, and optional source-export container targets
   build successfully with Ubuntu 26.04 and the pinned upstream CLIs.
 - All 20 tests pass inside the locally built container, with no skipped tests.
   This includes real KeePassXC round trips and colliding entry/folder paths.
@@ -23,8 +23,8 @@ publication use Ubuntu 26.04 runner hosts; the image itself also uses Ubuntu
   password.
 - Docker Compose itself verifies that the `.env` setup passes literal dollars,
   hashes, embedded quotes, and intentional spaces into a running container.
-- The source export's checksums pass. Runtime smoke checks confirm Ubuntu 26.04,
-  Node.js 24.22.2, KeePassXC 2.8.0, Bitwarden CLI 2026.10.1, and non-root execution.
+- The optional local source export's checksums pass. Runtime smoke checks confirm
+  Ubuntu 26.04, Node.js 24.22.2, KeePassXC 2.8.0, Bitwarden CLI 2026.10.1, and non-root execution.
   The ARM64 runtime is approximately 470 MiB uncompressed.
 
 The host provides ARM64 execution; amd64 requires the native CI runner. Local wrapper tests use cached Node.js
@@ -60,6 +60,7 @@ Live Bitwarden compatibility requires a dedicated test account and has not
 been verified. Disposable Vaultwarden coverage must not be presented as a live
 Bitwarden test.
 
-The release workflow publishes corresponding source archives before the GHCR
-image, then verifies anonymous image access. Source publication and public GHCR
-access must both succeed before publication is considered complete.
+The release workflow publishes the GHCR image and verifies anonymous access
+before creating the GitHub Release. Release notes link to the versioned container
+image; GitHub provides downloads of the project's own source. Third-party source
+bundles are not uploaded to releases.

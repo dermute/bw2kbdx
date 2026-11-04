@@ -36,8 +36,11 @@ records uncompressed image sizes for both architectures.
 
 To release, update the package versions and Compose image tag together, commit,
 and push a matching `vX.Y.Z` tag. Tests must pass before publication. The workflow
-publishes corresponding source archives to GitHub Releases, then builds the
-multiarchitecture image with SBOM/provenance and tags `X.Y.Z` and `latest`.
+publishes the multiarchitecture image with SBOM/provenance and tags `X.Y.Z` and
+`latest`, verifies anonymous image access, then creates the GitHub Release.
+Release notes link to the versioned container image and quick start. GitHub's
+automatic source ZIP and tar.gz downloads contain only this project's files;
+the release workflow does not build or upload a third-party source bundle.
 Use Conventional Commits and include `Co-authored-by: Codex <codex@openai.com>`
 on commits assisted by Codex.
 
@@ -47,8 +50,9 @@ Subsequent releases retain that visibility. No private-registry credentials
 should be needed by users pulling the public image.
 
 Original project code is MIT. Bundled tools retain their own licenses; see
-[third-party notices](../THIRD_PARTY_NOTICES.md) and each release's corresponding
-source bundle.
+[third-party notices and upstream source links](../THIRD_PARTY_NOTICES.md).
+The Dockerfile's optional `sources` target remains available for local inspection
+of upstream build inputs.
 
 ## Before pushing
 

@@ -15,23 +15,25 @@ The MIT license covers bw2kbdx's original code. It does not relicense its tools.
   are copied from the official Node image into the Ubuntu 26.04 base. See
   `/usr/local/LICENSE` and https://github.com/nodejs/node for source and notices.
 - **Ubuntu 26.04 runtime libraries**: individual licenses, including Qt (LGPL/GPL),
-  Botan (BSD), and readline (GPL). The release source bundle includes the Ubuntu
-  source packages and installed copyright notices for copied runtime libraries.
+  Botan (BSD), and readline (GPL). Copyright notices for copied runtime libraries
+  are installed in `/usr/share/bw2kbdx/ubuntu`. Source packages are available from
+  the Ubuntu package archives: https://archive.ubuntu.com/ubuntu/pool/
 
-Every published release must include `corresponding-source.tar.gz` alongside
-the binary container. This bundle contains the KeePassXC and Bitwarden source
-archives, Node source, Ubuntu library source packages, checksums, this notice,
-and the Dockerfile with the build procedure. It is generated in CI from the
-same build stages as the container. Do not publish an image without that bundle.
+GitHub Releases provide bw2kbdx's own source through GitHub's automatically
+generated ZIP and tar.gz downloads and link to the versioned container image
+at `ghcr.io/dermute/bw2kbdx`. Third-party source archives are not attached to
+project releases; the upstream sources are linked above.
 
-Build the source bundle locally with:
+For local inspection of upstream build inputs, the optional `sources` target
+exports the KeePassXC and Bitwarden sources, Node source, Ubuntu library source
+packages, checksums, notices, and build instructions:
 
 ```sh
 docker build --target sources --output type=local,dest=release-source .
 tar -czf corresponding-source.tar.gz -C release-source .
 ```
 
-Release source bundles: https://github.com/dermute/bw2kbdx/releases
+Project releases: https://github.com/dermute/bw2kbdx/releases
 
 The test image additionally uses PyKeePass (GPL-3.0) as an independent reader.
 It is not shipped in the runtime image.
