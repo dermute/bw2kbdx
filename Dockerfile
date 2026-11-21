@@ -72,7 +72,7 @@ COPY src/ /sources/src/
 COPY package.json package-lock.json LICENSE /sources/
 
 FROM base AS runtime
-ARG VERSION=0.1.0
+ARG VERSION=0.2.0
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="bw2kbdx" \
       org.opencontainers.image.description="Bitwarden/Vaultwarden personal-vault backups via KeePassXC XML import" \

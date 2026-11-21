@@ -1,6 +1,6 @@
 services:
   backup:
-    image: ghcr.io/dermute/bw2kbdx:0.1.0
+    image: ghcr.io/dermute/bw2kbdx:0.2.0
     restart: "no"
     user: "${BACKUP_UID:-1000}:${BACKUP_GID:-1000}"
     read_only: true

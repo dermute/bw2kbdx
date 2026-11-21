@@ -1,6 +1,6 @@
 {
   "name": "bw2kbdx",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "One-shot Bitwarden and Vaultwarden personal-vault backups using KeePassXC CLI",
   "private": true,
   "type": "module",

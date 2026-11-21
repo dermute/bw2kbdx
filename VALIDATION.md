@@ -6,17 +6,20 @@ publication use Ubuntu 26.04 runner hosts; the image itself also uses Ubuntu
 
 ## Local checks
 
-- 18 wrapper tests pass, covering conversion, multiple URLs, field collisions,
+- 22 wrapper tests pass, covering conversion, multiple URLs, field collisions,
   attachment bytes, timestamps, source JSON, configuration, subprocess errors,
-  cancellation, and retention of the previous backup after failure.
+  cancellation, empty backup passwords, configurable output permissions, and
+  retention of the previous backup and its permissions after failure.
 - Deployment and workflow YAML parses successfully. Shell scripts and the
   independent Python reader pass syntax checks.
 - Native ARM64 production, test, and optional source-export container targets
   build successfully with Ubuntu 26.04 and the pinned upstream CLIs.
-- All 20 tests pass inside the locally built container, with no skipped tests.
-  This includes real KeePassXC round trips and colliding entry/folder paths.
+- All 26 tests pass inside the locally built container, with no skipped tests.
+  This includes real KeePassXC round trips and colliding entry/folder paths with
+  both nonempty and empty backup passwords, plus published file permissions.
 - The independent PyKeePass reader opens the resulting KDBX and verifies exact
-  passwords, CRLF content, URLs, binary attachments, and the original JSON.
+  passwords, CRLF content, URLs, binary attachments, and the original JSON, for
+  both nonempty and empty backup passwords.
 - The complete disposable Vaultwarden 1.37.5 test passes over HTTPS: registration,
   API-key login, unlock, import, sync, attachment upload/download, four-item backup
   with two attachments, multiple URLs, and retention after an incorrect master
@@ -27,9 +30,8 @@ publication use Ubuntu 26.04 runner hosts; the image itself also uses Ubuntu
   Ubuntu 26.04, Node.js 24.22.2, KeePassXC 2.8.0, Bitwarden CLI 2026.10.1, and non-root execution.
   The ARM64 runtime is approximately 470 MiB uncompressed.
 
-The host provides ARM64 execution; amd64 requires the native CI runner. Local wrapper tests use cached Node.js
-22.23.3 with `node --experimental-test-isolation=none --test test/*.test.ts`.
-The container suite uses the pinned Node.js 24 runtime and real upstream CLIs.
+The host provides ARM64 execution; amd64 requires the native CI runner. Local
+tests use the pinned Node.js 24 container runtime and real upstream CLIs.
 
 ## Required container checks
 
