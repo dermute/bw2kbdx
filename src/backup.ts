@@ -108,7 +108,10 @@ export async function backup(config: Config, options: Options = {}): Promise<{ i
     }, runner);
     progress('atomic replacement');
     const file = await open(database, 'r');
-    try { await file.sync(); } finally { await file.close(); }
+    try {
+      await file.chmod(config.outputMode);
+      await file.sync();
+    } finally { await file.close(); }
     options.signal?.throwIfAborted();
     await rename(database, join(config.outputDir, 'backup.kdbx'));
     return { items: conversion.itemCount, attachments: conversion.attachmentCount };

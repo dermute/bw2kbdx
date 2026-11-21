@@ -17,6 +17,7 @@ The official Bitwarden CLI requires HTTPS, including on shared Docker networks.
 | `BW_CLIENTSECRET` | Personal API client secret, required |
 | `BW_PASSWORD` | Master password, required |
 | `KDBX_PASSWORD` | Fixed backup password; set to `''` for an empty password |
+| `KDBX_FILE_MODE` | `0600`; octal permissions for the published KDBX file |
 | `BACKUP_DIR` | `/backups`; output directory inside the container |
 | `BACKUP_UID`, `BACKUP_GID` | Compose-only settings; default `1000:1000` |
 
@@ -33,10 +34,17 @@ KeePassXC with the password field left empty. Anyone with the file can read
 its contents when the password is empty.
 
 The output directory must already exist and be writable by the configured user.
-The database has mode `0600`; scratch directories have mode `0700`. Run with a
-read-only root filesystem and a **tmpfs at `/tmp`**, as in `compose.yaml`. The
-program refuses non-tmpfs scratch storage. tmpfs may be swapped by the host;
-configure host swap appropriately for your environment.
+The database defaults to mode `0600` (owner read/write). Set `KDBX_FILE_MODE`
+to `0640` to also allow group reads, `0644` to allow everyone to read, or `0660`
+to allow group reads and writes. Use three octal digits with an optional leading
+zero. Use `BACKUP_GID` to select the container's group, and ensure the host backup
+directory allows the intended users to traverse it. The configured permissions
+are applied after verification, before replacing the previous backup.
+
+Scratch directories have mode `0700`; temporary database files stay at `0600`
+during verification. Run with a read-only root filesystem and a **tmpfs at `/tmp`**,
+as in `compose.yaml`. The program refuses non-tmpfs scratch storage. tmpfs may be
+swapped by the host; configure host swap appropriately for your environment.
 
 The official Bitwarden binary may load bundled native components from temporary
 storage, so the example tmpfs permits execution. Plaintext XML and CLI state are

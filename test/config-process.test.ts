@@ -51,6 +51,17 @@ test('an explicitly empty KDBX password is accepted from the environment or a se
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test('KDBX file permissions default to 0600 and accept only octal permission bits', async () => {
+  assert.equal((await loadConfig(secrets)).outputMode, 0o600);
+  for (const [value, expected] of [['600', 0o600], ['0600', 0o600], ['640', 0o640], ['0640', 0o640],
+    ['0644', 0o644], ['0660', 0o660], ['0664', 0o664], ['0440', 0o440], ['000', 0o000], ['0000', 0o000], ['0777', 0o777]] as const) {
+    assert.equal((await loadConfig({ ...secrets, KDBX_FILE_MODE: value })).outputMode, expected);
+  }
+  for (const value of ['', '0', '60', '888', '0680', '0o640', '0x1a0', '1000', '1644', '4644', '-600', ' 640', '640 ', '640\n', '644junk']) {
+    await assert.rejects(loadConfig({ ...secrets, KDBX_FILE_MODE: value }), /KDBX_FILE_MODE/);
+  }
+});
+
 test('subprocess runner preserves binary output and suppresses diagnostics on failure', async () => {
   const options = { env: process.env, cwd: tmpdir() };
   assert.deepEqual(await run('/bin/sh', ['-c', "printf '\\000\\377\\200\\015\\012'"], options), Buffer.from([0,255,128,13,10]));

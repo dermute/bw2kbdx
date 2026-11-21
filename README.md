@@ -24,6 +24,8 @@ and `KDBX_PASSWORD` (separate backup password, or `''` for an empty password).
 For Vaultwarden, set `BW_SERVER` to its HTTPS URL. Keep secrets single-quoted;
 escape an embedded quote as `\'`.
 If your host UID/GID differs from `1000:1000`, adjust `BACKUP_UID`/`BACKUP_GID`.
+File permissions default to `0600`. Set `KDBX_FILE_MODE=0640` for group read
+access or `KDBX_FILE_MODE=0644` to let everyone read the file.
 
 ```sh
 docker compose pull backup

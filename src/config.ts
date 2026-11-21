@@ -8,6 +8,7 @@ export interface Config {
   masterPassword: string;
   backupPassword: string;
   outputDir: string;
+  outputMode: number;
 }
 
 export class SafeError extends Error {}
@@ -31,10 +32,15 @@ export async function loadConfig(env: NodeJS.ProcessEnv = process.env): Promise<
     const url = new URL(server);
     if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error();
   } catch { throw new SafeError('BW_SERVER must be an HTTPS base URL without credentials, query, or fragment'); }
+  const outputMode = env.KDBX_FILE_MODE ?? '0600';
+  if (!/^0?[0-7]{3}$/.test(outputMode)) {
+    throw new SafeError('KDBX_FILE_MODE must be an octal file mode such as 0600, 0640, or 0644');
+  }
   return {
     server, clientId: await secret('BW_CLIENTID'), clientSecret: await secret('BW_CLIENTSECRET'),
     masterPassword: await secret('BW_PASSWORD'), backupPassword: await secret('KDBX_PASSWORD', true),
     outputDir: resolve(env.BACKUP_DIR || '/backups'),
+    outputMode: Number.parseInt(outputMode, 8),
   };
 }
 

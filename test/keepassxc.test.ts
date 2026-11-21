@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { accessSync, constants } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fixture } from './fixture.ts';
@@ -51,7 +51,8 @@ for (const password of ['synthetic-backup-password', '']) {
       const { vault, downloads, raw } = fixture();
       const conversion = convert(vault, raw, downloads);
       const config = await loadConfig({ BW_CLIENTID: 'user.test', BW_CLIENTSECRET: 'synthetic-client-secret',
-        BW_PASSWORD: 'synthetic-master-password', KDBX_PASSWORD: password, BACKUP_DIR: dir });
+        BW_PASSWORD: 'synthetic-master-password', KDBX_PASSWORD: password, BACKUP_DIR: dir,
+        KDBX_FILE_MODE: password ? '0640' : '0644' });
       const result = await backup(config, { requireTmpfs: false, runner: async (program, args, options) => {
         if (program === 'keepassxc-cli') return run(program, args, options);
         assert.equal(program, 'bw');
@@ -72,6 +73,7 @@ for (const password of ['synthetic-backup-password', '']) {
       } });
       assert.deepEqual(result, { items: vault.items.length, attachments: downloads.length });
       const db = join(dir, 'backup.kdbx');
+      assert.equal((await stat(db)).mode & 0o777, config.outputMode);
       const options = { cwd: dir, env: subprocessEnv(dir) };
       verifyHeader(await readFile(db));
       const exported = await run('keepassxc-cli', ['export', '--quiet', '--format', 'xml', db], { ...options, input: `${password}\n` });

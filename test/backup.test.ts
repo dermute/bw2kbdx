@@ -13,7 +13,7 @@ export async function harness(failAt?: string, corrupt = false, corruptAttachmen
   const dir = await mkdtemp(join(tmpdir(), 'bw2kbdx-pipeline-'));
   const outputDir = join(dir, 'output'); await mkdir(outputDir);
   const config: Config = { server: 'https://vault.example.test', clientId: 'test-client', clientSecret: 'client-secret',
-    masterPassword: 'master-secret', backupPassword: 'backup-secret', outputDir };
+    masterPassword: 'master-secret', backupPassword: 'backup-secret', outputDir, outputMode: 0o600 };
   const calls: string[] = [];
   const { vault, raw, downloads } = fixture();
   let importedXml = '';
@@ -50,6 +50,7 @@ export async function harness(failAt?: string, corrupt = false, corruptAttachmen
       await chmod(args.at(-1)!, 0o600);
     } else if (command === 'export') {
       assert.equal(options.input, `${config.backupPassword}\n`);
+      assert.equal((await stat(args.at(-1)!)).mode & 0o777, 0o600, 'Database stays private during verification');
       return Buffer.from(corrupt ? importedXml.replace('https://other.example.test/login', 'wrong') : importedXml);
     } else if (command === 'attachment-export') {
       assert.equal(options.input, `${config.backupPassword}\n`);
@@ -85,6 +86,20 @@ for (const backupPassword of ['backup-secret', '']) {
   });
 }
 
+test('verified backups receive the configured permissions, including modes without owner read access', async () => {
+  for (const outputMode of [0o640, 0o644, 0o660, 0o664, 0o440, 0o000]) {
+    const h = await harness();
+    h.config.outputMode = outputMode;
+    try {
+      await writeFile(join(h.config.outputDir, 'backup.kdbx'), 'previous backup');
+      await backup(h.config, { runner: h.runner, tempRoot: h.dir, requireTmpfs: false });
+      assert.equal((await stat(join(h.config.outputDir, 'backup.kdbx'))).mode & 0o777, outputMode);
+      assert.deepEqual(await readdir(h.dir), ['output']);
+      assert.deepEqual(await readdir(h.config.outputDir), ['backup.kdbx']);
+    } finally { await rm(h.dir, { recursive: true, force: true }); }
+  }
+});
+
 for (const failAt of ['login', 'unlock', 'sync', 'get', 'import', 'attachment-export']) {
   test(`failure at ${failAt} preserves the last backup and sanitizes diagnostics`, async () => {
     const h = await harness(failAt);
@@ -103,10 +118,13 @@ for (const failAt of ['login', 'unlock', 'sync', 'get', 'import', 'attachment-ex
 
 test('verification failure preserves previous database', async () => {
   const h = await harness(undefined, true);
+  h.config.outputMode = 0o644;
   try {
     await writeFile(join(h.config.outputDir, 'backup.kdbx'), 'previous backup');
+    await chmod(join(h.config.outputDir, 'backup.kdbx'), 0o640);
     await assert.rejects(backup(h.config, { runner: h.runner, tempRoot: h.dir, requireTmpfs: false }), /database verification/);
     assert.equal(await readFile(join(h.config.outputDir, 'backup.kdbx'), 'utf8'), 'previous backup');
+    assert.equal((await stat(join(h.config.outputDir, 'backup.kdbx'))).mode & 0o777, 0o640);
     assert.deepEqual(await readdir(h.config.outputDir), ['backup.kdbx']);
   } finally { await rm(h.dir, { recursive: true, force: true }); }
 });

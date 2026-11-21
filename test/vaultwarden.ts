@@ -85,7 +85,7 @@ try {
   }
   const outputDir = join(workdir, 'output'); await mkdir(outputDir);
   const config = { server, clientId: credentials.BW_CLIENTID, clientSecret: api.apiKey, masterPassword: password,
-    backupPassword: 'synthetic-backup-password', outputDir };
+    backupPassword: 'synthetic-backup-password', outputDir, outputMode: 0o600 };
   assert.deepEqual(await backup(config), { items: 4, attachments: 2 });
   const db = join(outputDir, 'backup.kdbx');
   const exported = await run('keepassxc-cli', ['export', '--quiet', '--format', 'xml', db], {
