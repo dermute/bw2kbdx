@@ -13,7 +13,7 @@ export interface Config {
 export class SafeError extends Error {}
 
 export async function loadConfig(env: NodeJS.ProcessEnv = process.env): Promise<Config> {
-  async function secret(name: string): Promise<string> {
+  async function secret(name: string, allowEmpty = false): Promise<string> {
     if (env[name] !== undefined && env[`${name}_FILE`] !== undefined) throw new SafeError(`Set only ${name} or ${name}_FILE`);
     let value = env[name];
     if (env[`${name}_FILE`] !== undefined) {
@@ -21,7 +21,9 @@ export async function loadConfig(env: NodeJS.ProcessEnv = process.env): Promise<
         value = (await readFile(env[`${name}_FILE`]!, 'utf8')).replace(/\r?\n$/, '');
       } catch { throw new SafeError(`Cannot read ${name}_FILE`); }
     }
-    if (!value || /[\r\n\0]/.test(value)) throw new SafeError(`${name} must be a nonempty single-line secret`);
+    if (value === undefined || (!allowEmpty && value === '') || /[\r\n\0]/.test(value)) {
+      throw new SafeError(`${name} must be ${allowEmpty ? 'an explicitly set' : 'a nonempty'} single-line secret`);
+    }
     return value;
   }
   const server = env.BW_SERVER || 'https://vault.bitwarden.com';
@@ -31,7 +33,7 @@ export async function loadConfig(env: NodeJS.ProcessEnv = process.env): Promise<
   } catch { throw new SafeError('BW_SERVER must be an HTTPS base URL without credentials, query, or fragment'); }
   return {
     server, clientId: await secret('BW_CLIENTID'), clientSecret: await secret('BW_CLIENTSECRET'),
-    masterPassword: await secret('BW_PASSWORD'), backupPassword: await secret('KDBX_PASSWORD'),
+    masterPassword: await secret('BW_PASSWORD'), backupPassword: await secret('KDBX_PASSWORD', true),
     outputDir: resolve(env.BACKUP_DIR || '/backups'),
   };
 }

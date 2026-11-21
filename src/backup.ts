@@ -92,8 +92,10 @@ export async function backup(config: Config, options: Options = {}): Promise<{ i
     await chmod(outputTemp, 0o700);
     const database = join(outputTemp, 'backup.kdbx');
     progress('KeePassXC import');
+    // KeePassXC asks for confirmation instead of repetition for an empty password.
+    const importInput = config.backupPassword === '' ? '\ny\n' : `${config.backupPassword}\n${config.backupPassword}\n`;
     await runner('keepassxc-cli', ['import', '--quiet', '--set-password', '--decryption-time', '1000', xmlPath, database], {
-      cwd: workdir, env: baseEnv, input: `${config.backupPassword}\n${config.backupPassword}\n`, signal: options.signal,
+      cwd: workdir, env: baseEnv, input: importInput, signal: options.signal,
     });
     await chmod(database, 0o600);
     progress('database verification');

@@ -3,9 +3,9 @@
 <p align="center"><img src="assets/header.png" alt="Bitwarden or Vaultwarden vault converted into a KeePass .kdbx database" width="720"></p>
 
 Back up a **Bitwarden or Vaultwarden personal vault** to an encrypted KeePass
-**`.kdbx`** file with a separate password. Preserves multiple URLs, custom fields,
-and attachments using KeePassXC CLI. Runs once, verifies the result, and replaces
-`backup.kdbx`; a failed run keeps the previous backup.
+**`.kdbx`** file with a separate or empty password. Preserves multiple URLs,
+custom fields, and attachments using KeePassXC CLI. Runs once, verifies the
+result, and replaces `backup.kdbx`; a failed run keeps the previous backup.
 
 ## Quick start
 
@@ -20,8 +20,9 @@ mkdir -p backups
 ```
 
 Edit **`.env`**: set `BW_CLIENTID`, `BW_CLIENTSECRET`, `BW_PASSWORD` (master password),
-and `KDBX_PASSWORD` (separate backup password). For Vaultwarden, set `BW_SERVER`
-to its HTTPS URL. Keep secrets single-quoted; escape an embedded quote as `\'`.
+and `KDBX_PASSWORD` (separate backup password, or `''` for an empty password).
+For Vaultwarden, set `BW_SERVER` to its HTTPS URL. Keep secrets single-quoted;
+escape an embedded quote as `\'`.
 If your host UID/GID differs from `1000:1000`, adjust `BACKUP_UID`/`BACKUP_GID`.
 
 ```sh
@@ -29,7 +30,8 @@ docker compose pull backup
 docker compose run --rm --no-deps backup
 ```
 
-Open **`backups/backup.kdbx`** in KeePassXC with your backup password.
+Open **`backups/backup.kdbx`** in KeePassXC with your backup password, or leave the
+password field empty if you set `KDBX_PASSWORD=''`.
 
 ## Run regularly
 

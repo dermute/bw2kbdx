@@ -43,14 +43,16 @@ export async function harness(failAt?: string, corrupt = false, corruptAttachmen
         return attachment.data;
       }
     } else if (command === 'import') {
-      assert.equal(options.input, 'backup-secret\nbackup-secret\n');
+      assert.ok(args.includes('--set-password'));
+      assert.equal(options.input, config.backupPassword === '' ? '\ny\n' : 'backup-secret\nbackup-secret\n');
       importedXml = await readFile(args.at(-2)!, 'utf8');
       await writeFile(args.at(-1)!, fakeHeader());
       await chmod(args.at(-1)!, 0o600);
     } else if (command === 'export') {
-      assert.equal(options.input, 'backup-secret\n');
+      assert.equal(options.input, `${config.backupPassword}\n`);
       return Buffer.from(corrupt ? importedXml.replace('https://other.example.test/login', 'wrong') : importedXml);
     } else if (command === 'attachment-export') {
+      assert.equal(options.input, `${config.backupPassword}\n`);
       const xml = parseXml(importedXml);
       function find(node: ReturnType<typeof parseXml>): ReturnType<typeof parseXml> | undefined {
         return children(node, 'Binary').find(binary => children(binary, 'Key').some(key => key.text === args.at(-2)))
@@ -66,19 +68,22 @@ export async function harness(failAt?: string, corrupt = false, corruptAttachmen
   return { dir, config, runner, calls };
 }
 
-test('one-shot pipeline syncs, exports, downloads, verifies, atomically replaces and cleans up', async () => {
-  const h = await harness();
-  try {
-    await writeFile(join(h.config.outputDir, 'backup.kdbx'), 'previous backup');
-    assert.deepEqual(await backup(h.config, { runner: h.runner, tempRoot: h.dir, requireTmpfs: false }), { items: 6, attachments: 3 });
-    assert.deepEqual(await readFile(join(h.config.outputDir, 'backup.kdbx')), fakeHeader());
-    assert.equal((await stat(join(h.config.outputDir, 'backup.kdbx'))).mode & 0o777, 0o600);
-    assert.deepEqual(h.calls, ['config', 'login', 'unlock', 'sync', 'export', 'list', 'get', 'get', 'get', 'import', 'export',
-      ...Array(5).fill('attachment-export')]);
-    assert.deepEqual(await readdir(h.dir), ['output']);
-    assert.deepEqual(await readdir(h.config.outputDir), ['backup.kdbx']);
-  } finally { await rm(h.dir, { recursive: true, force: true }); }
-});
+for (const backupPassword of ['backup-secret', '']) {
+  test(`one-shot pipeline syncs, exports, downloads, verifies, atomically replaces and cleans up (${backupPassword ? 'password' : 'empty password'})`, async () => {
+    const h = await harness();
+    h.config.backupPassword = backupPassword;
+    try {
+      await writeFile(join(h.config.outputDir, 'backup.kdbx'), 'previous backup');
+      assert.deepEqual(await backup(h.config, { runner: h.runner, tempRoot: h.dir, requireTmpfs: false }), { items: 6, attachments: 3 });
+      assert.deepEqual(await readFile(join(h.config.outputDir, 'backup.kdbx')), fakeHeader());
+      assert.equal((await stat(join(h.config.outputDir, 'backup.kdbx'))).mode & 0o777, 0o600);
+      assert.deepEqual(h.calls, ['config', 'login', 'unlock', 'sync', 'export', 'list', 'get', 'get', 'get', 'import', 'export',
+        ...Array(5).fill('attachment-export')]);
+      assert.deepEqual(await readdir(h.dir), ['output']);
+      assert.deepEqual(await readdir(h.config.outputDir), ['backup.kdbx']);
+    } finally { await rm(h.dir, { recursive: true, force: true }); }
+  });
+}
 
 for (const failAt of ['login', 'unlock', 'sync', 'get', 'import', 'attachment-export']) {
   test(`failure at ${failAt} preserves the last backup and sanitizes diagnostics`, async () => {

@@ -28,6 +28,29 @@ test('configuration reads secrets without trimming intentional spaces and reject
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test('an explicitly empty KDBX password is accepted from the environment or a secret file', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'bw2kbdx-config-'));
+  try {
+    assert.equal((await loadConfig({ ...secrets, KDBX_PASSWORD: '' })).backupPassword, '');
+    const path = join(dir, 'password');
+    for (const contents of ['', '\n', '\r\n']) {
+      await writeFile(path, contents);
+      assert.equal((await loadConfig({ ...secrets, KDBX_PASSWORD: undefined, KDBX_PASSWORD_FILE: path })).backupPassword, '');
+    }
+    await assert.rejects(loadConfig({ ...secrets, KDBX_PASSWORD: undefined }), /KDBX_PASSWORD/);
+    await assert.rejects(loadConfig({ ...secrets, KDBX_PASSWORD: '', KDBX_PASSWORD_FILE: path }), /Set only/);
+    await assert.rejects(loadConfig({ ...secrets, KDBX_PASSWORD: undefined, KDBX_PASSWORD_FILE: join(dir, 'missing') }), /Cannot read KDBX_PASSWORD_FILE/);
+    for (const value of ['bad\npassword', 'bad\rpassword', 'bad\0password']) {
+      await assert.rejects(loadConfig({ ...secrets, KDBX_PASSWORD: value }), /single-line/);
+      await writeFile(path, value);
+      await assert.rejects(loadConfig({ ...secrets, KDBX_PASSWORD: undefined, KDBX_PASSWORD_FILE: path }), /single-line/);
+    }
+    for (const name of ['BW_CLIENTID', 'BW_CLIENTSECRET', 'BW_PASSWORD']) {
+      await assert.rejects(loadConfig({ ...secrets, [name]: '' }), new RegExp(name));
+    }
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 test('subprocess runner preserves binary output and suppresses diagnostics on failure', async () => {
   const options = { env: process.env, cwd: tmpdir() };
   assert.deepEqual(await run('/bin/sh', ['-c', "printf '\\000\\377\\200\\015\\012'"], options), Buffer.from([0,255,128,13,10]));

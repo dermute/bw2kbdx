@@ -16,7 +16,7 @@ The official Bitwarden CLI requires HTTPS, including on shared Docker networks.
 | `BW_CLIENTID` | Personal API client ID, required |
 | `BW_CLIENTSECRET` | Personal API client secret, required |
 | `BW_PASSWORD` | Master password, required |
-| `KDBX_PASSWORD` | Fixed backup password, required |
+| `KDBX_PASSWORD` | Fixed backup password; set to `''` for an empty password |
 | `BACKUP_DIR` | `/backups`; output directory inside the container |
 | `BACKUP_UID`, `BACKUP_GID` | Compose-only settings; default `1000:1000` |
 
@@ -25,7 +25,12 @@ the direct value or its file alternative. The Compose example loads `.env`.
 File-based secrets are optional: configure `_FILE` paths and mount those files
 when you prefer that deployment style.
 One final newline is removed from secret files; intentional spaces are kept.
-Empty secrets, embedded newlines, and NUL characters are rejected.
+Embedded newlines and NUL characters are rejected. Bitwarden credentials must
+be nonempty. For a backup with an empty password, explicitly set
+`KDBX_PASSWORD=''` in `.env`, or point `KDBX_PASSWORD_FILE` at an empty file.
+Leaving both variables unset is an error. Open the resulting database in
+KeePassXC with the password field left empty. Anyone with the file can read
+its contents when the password is empty.
 
 The output directory must already exist and be writable by the configured user.
 The database has mode `0600`; scratch directories have mode `0700`. Run with a
