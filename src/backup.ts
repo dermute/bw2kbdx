@@ -40,6 +40,15 @@ export async function backup(config: Config, options: Options = {}): Promise<{ i
     });
     progress('server configuration');
     await bw(['config', 'server', config.server]);
+    if (config.deviceIdentifier) {
+      progress('device identity');
+      // Let the pinned CLI initialize/migrate its profile before setting its
+      // application ID. Only the UUID is reused; all CLI state stays on tmpfs.
+      const statePath = join(bwEnv.BITWARDENCLI_APPDATA_DIR, 'data.json');
+      const state = JSON.parse(await readFile(statePath, 'utf8'));
+      state.global_applicationId_appId = config.deviceIdentifier;
+      await writeFile(statePath, JSON.stringify(state), { mode: 0o600 });
+    }
     progress('API login');
     await bw(['login', '--apikey'], { BW_CLIENTID: config.clientId, BW_CLIENTSECRET: config.clientSecret });
     progress('vault unlock');

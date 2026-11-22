@@ -13,6 +13,7 @@ The official Bitwarden CLI requires HTTPS, including on shared Docker networks.
 | Variable | Default / purpose |
 | --- | --- |
 | `BW_SERVER` | `https://vault.bitwarden.com`; Bitwarden-compatible HTTPS base URL |
+| `BW_DEVICE_IDENTIFIER` | Optional stable device UUID; unset/empty creates a new device each run |
 | `BW_CLIENTID` | Personal API client ID, required |
 | `BW_CLIENTSECRET` | Personal API client secret, required |
 | `BW_PASSWORD` | Master password, required |
@@ -57,6 +58,27 @@ plus the Bitwarden CLI and KeePassXC overhead. The example allocates a 512 MiB
 tmpfs; increase it for larger vaults. Each subprocess has a five-minute timeout
 and a 512 MiB stdout limit. Exceeding either fails the backup without replacement.
 Credentials and raw subprocess diagnostics are never logged.
+
+### Repeated new-device login emails
+
+By default, each run creates a fresh CLI profile with a new device ID, which can
+trigger a new-device login email every time. Generate a UUID **once** with
+`uuidgen`, then add it to `.env`:
+
+```dotenv
+BW_DEVICE_IDENTIFIER=your-generated-uuid
+```
+
+Keep that value unchanged for this backup installation. The first run with the
+UUID may still send a notification; later runs reuse the recognized device.
+Changing it or removing the device on the server can trigger another email.
+Use a different UUID for each backup installation. This setting stores only a
+device identifier in `.env`; CLI tokens, vault caches, and plaintext scratch data
+still stay on tmpfs and are deleted after each run. Server notification settings
+remain enabled. This setting requires version `0.3.0` or later. For an existing
+deployment, update the backup service's image in `compose.yaml` to
+`ghcr.io/dermute/bw2kbdx:0.3.0`, then run `docker compose pull backup` before the
+next backup.
 
 ## What is preserved
 

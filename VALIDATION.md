@@ -6,15 +6,16 @@ publication use Ubuntu 26.04 runner hosts; the image itself also uses Ubuntu
 
 ## Local checks
 
-- 22 wrapper tests pass, covering conversion, multiple URLs, field collisions,
+- 25 wrapper tests pass, covering conversion, multiple URLs, field collisions,
   attachment bytes, timestamps, source JSON, configuration, subprocess errors,
   cancellation, empty backup passwords, configurable output permissions, and
-  retention of the previous backup and its permissions after failure.
+  retention of the previous backup and its permissions after failure, stable
+  device UUID configuration, reuse across fresh profiles, and CLI state cleanup.
 - Deployment and workflow YAML parses successfully. Shell scripts and the
   independent Python reader pass syntax checks.
 - Native ARM64 production, test, and optional source-export container targets
   build successfully with Ubuntu 26.04 and the pinned upstream CLIs.
-- All 26 tests pass inside the locally built container, with no skipped tests.
+- All 29 tests pass inside the locally built container, with no skipped tests.
   This includes real KeePassXC round trips and colliding entry/folder paths with
   both nonempty and empty backup passwords, plus published file permissions.
 - The independent PyKeePass reader opens the resulting KDBX and verifies exact
@@ -23,7 +24,8 @@ publication use Ubuntu 26.04 runner hosts; the image itself also uses Ubuntu
 - The complete disposable Vaultwarden 1.37.5 test passes over HTTPS: registration,
   API-key login, unlock, import, sync, attachment upload/download, four-item backup
   with two attachments, multiple URLs, and retention after an incorrect master
-  password.
+  password. Two backups with fresh CLI profiles reuse the configured device UUID
+  without adding a second server device record.
 - Docker Compose itself verifies that the `.env` setup passes literal dollars,
   hashes, embedded quotes, and intentional spaces into a running container.
 - The optional local source export's checksums pass. Runtime smoke checks confirm
@@ -45,7 +47,8 @@ runs these checks on native amd64 and arm64 runners:
 - Open the generated database with the independent PyKeePass reader.
 - Seed a disposable Vaultwarden vault with multiple URLs and duplicate attachment
   filenames, run the complete backup, and confirm an incorrect master password
-  leaves the previous backup intact.
+  leaves the previous backup intact. Confirm repeated backups reuse a configured
+  device UUID across fresh CLI profiles.
 - Assert Ubuntu 26.04, Node.js 24, non-root execution, CLI versions, and record
   the uncompressed runtime image size.
 

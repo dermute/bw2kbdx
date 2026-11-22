@@ -85,8 +85,25 @@ try {
   }
   const outputDir = join(workdir, 'output'); await mkdir(outputDir);
   const config = { server, clientId: credentials.BW_CLIENTID, clientSecret: api.apiKey, masterPassword: password,
-    backupPassword: 'synthetic-backup-password', outputDir, outputMode: 0o600 };
+    backupPassword: 'synthetic-backup-password', outputDir, outputMode: 0o600, deviceIdentifier: randomUUID() };
+  async function deviceCount(): Promise<number> {
+    const response = await fetch(`${server}/api/devices`, { signal: AbortSignal.timeout(30000),
+      headers: { Authorization: `Bearer ${token.access_token}` },
+    });
+    assert.ok(response.ok, 'Could not list disposable account devices');
+    const devices = await response.json() as { data: unknown[] };
+    assert.ok(Array.isArray(devices.data));
+    return devices.data.length;
+  }
+  const devicesBefore = await deviceCount();
   assert.deepEqual(await backup(config), { items: 4, attachments: 2 });
+  assert.equal(await deviceCount(), devicesBefore + 1, 'First backup registers one device');
+  const recognized = await fetch(`${server}/api/devices/identifier/${config.deviceIdentifier}`, {
+    signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${token.access_token}` },
+  });
+  assert.ok(recognized.ok, 'Server must recognize the configured device UUID');
+  assert.deepEqual(await backup(config), { items: 4, attachments: 2 });
+  assert.equal(await deviceCount(), devicesBefore + 1, 'Fresh CLI profiles must reuse the same server device');
   const db = join(outputDir, 'backup.kdbx');
   const exported = await run('keepassxc-cli', ['export', '--quiet', '--format', 'xml', db], {
     cwd: workdir, env: subprocessEnv(workdir), input: 'synthetic-backup-password\n',

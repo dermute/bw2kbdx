@@ -26,6 +26,9 @@ escape an embedded quote as `\'`.
 If your host UID/GID differs from `1000:1000`, adjust `BACKUP_UID`/`BACKUP_GID`.
 File permissions default to `0600`. Set `KDBX_FILE_MODE=0640` for group read
 access or `KDBX_FILE_MODE=0644` to let everyone read the file.
+To avoid a new-device login email on each run, set `BW_DEVICE_IDENTIFIER` to a
+UUID generated once with `uuidgen`; see [login notification setup](docs/usage.md#repeated-new-device-login-emails)
+for details.
 
 ```sh
 docker compose pull backup

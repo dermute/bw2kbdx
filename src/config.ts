@@ -9,6 +9,7 @@ export interface Config {
   backupPassword: string;
   outputDir: string;
   outputMode: number;
+  deviceIdentifier?: string;
 }
 
 export class SafeError extends Error {}
@@ -36,11 +37,16 @@ export async function loadConfig(env: NodeJS.ProcessEnv = process.env): Promise<
   if (!/^0?[0-7]{3}$/.test(outputMode)) {
     throw new SafeError('KDBX_FILE_MODE must be an octal file mode such as 0600, 0640, or 0644');
   }
+  const deviceIdentifier = env.BW_DEVICE_IDENTIFIER || undefined;
+  if (deviceIdentifier !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deviceIdentifier)) {
+    throw new SafeError('BW_DEVICE_IDENTIFIER must be a UUID, or empty to use a new device each run');
+  }
   return {
     server, clientId: await secret('BW_CLIENTID'), clientSecret: await secret('BW_CLIENTSECRET'),
     masterPassword: await secret('BW_PASSWORD'), backupPassword: await secret('KDBX_PASSWORD', true),
     outputDir: resolve(env.BACKUP_DIR || '/backups'),
     outputMode: Number.parseInt(outputMode, 8),
+    deviceIdentifier: deviceIdentifier?.toLowerCase(),
   };
 }
 

@@ -62,6 +62,20 @@ test('KDBX file permissions default to 0600 and accept only octal permission bit
   }
 });
 
+test('a stable device UUID is optional, normalized, and validated without logging its value', async () => {
+  assert.equal((await loadConfig(secrets)).deviceIdentifier, undefined);
+  assert.equal((await loadConfig({ ...secrets, BW_DEVICE_IDENTIFIER: '' })).deviceIdentifier, undefined);
+  const uuid = 'ABCDEF01-2345-4678-9ABC-DEF012345678';
+  assert.equal((await loadConfig({ ...secrets, BW_DEVICE_IDENTIFIER: uuid })).deviceIdentifier, uuid.toLowerCase());
+  for (const value of ['not-a-uuid', 'abcdef01-2345-4678-9abc-def01234567', `${uuid}\n`, ` ${uuid}`, `${uuid} `]) {
+    await assert.rejects(loadConfig({ ...secrets, BW_DEVICE_IDENTIFIER: value }), error => {
+      assert.match(String(error), /BW_DEVICE_IDENTIFIER must be a UUID/);
+      assert.ok(!String(error).includes(value));
+      return true;
+    });
+  }
+});
+
 test('subprocess runner preserves binary output and suppresses diagnostics on failure', async () => {
   const options = { env: process.env, cwd: tmpdir() };
   assert.deepEqual(await run('/bin/sh', ['-c', "printf '\\000\\377\\200\\015\\012'"], options), Buffer.from([0,255,128,13,10]));

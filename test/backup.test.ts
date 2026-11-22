@@ -25,7 +25,13 @@ export async function harness(failAt?: string, corrupt = false, corruptAttachmen
     assert.equal(options.env.KDBX_PASSWORD, undefined);
     if (command === failAt) throw new Error('raw upstream error containing master-secret');
     if (program === 'bw') {
-      if (command === 'login') {
+      if (command === 'config') {
+        const profile = options.env.BITWARDENCLI_APPDATA_DIR!;
+        await mkdir(profile, { mode: 0o700 });
+        await writeFile(join(profile, 'data.json'), JSON.stringify({
+          global_applicationId_appId: 'fresh-device', configuredServer: config.server,
+        }), { mode: 0o600 });
+      } else if (command === 'login') {
         assert.equal(options.env.BW_CLIENTSECRET, config.clientSecret);
       } else if (command === 'unlock') {
         assert.equal(options.env.BW2KBDX_MASTER, config.masterPassword);
@@ -69,6 +75,52 @@ export async function harness(failAt?: string, corrupt = false, corruptAttachmen
   return { dir, config, runner, calls };
 }
 
+test('a stable device ID survives fresh profiles without persisting CLI state', async () => {
+  const h = await harness();
+  h.config.deviceIdentifier = 'abcdef01-2345-4678-9abc-def012345678';
+  const profiles = new Set<string>();
+  const runner: Runner = async (program, args, options) => {
+    if (program === 'bw' && args[1] === 'login') {
+      const profile = options.env.BITWARDENCLI_APPDATA_DIR!;
+      profiles.add(profile);
+      assert.deepEqual(JSON.parse(await readFile(join(profile, 'data.json'), 'utf8')), {
+        global_applicationId_appId: h.config.deviceIdentifier, configuredServer: h.config.server,
+      });
+      assert.equal((await stat(profile)).mode & 0o777, 0o700);
+      assert.equal((await stat(join(profile, 'data.json'))).mode & 0o777, 0o600);
+      assert.equal(options.env.BW_SESSION, undefined);
+    }
+    return h.runner(program, args, options);
+  };
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      assert.deepEqual(await backup(h.config, { runner, tempRoot: h.dir, requireTmpfs: false }), { items: 6, attachments: 3 });
+      assert.deepEqual(await readdir(h.dir), ['output']);
+      assert.deepEqual(await readdir(h.config.outputDir), ['backup.kdbx']);
+    }
+    assert.equal(profiles.size, 2);
+  } finally { await rm(h.dir, { recursive: true, force: true }); }
+});
+
+test('an invalid CLI profile fails before login and preserves the previous backup', async () => {
+  const h = await harness();
+  h.config.deviceIdentifier = 'abcdef01-2345-4678-9abc-def012345678';
+  const runner: Runner = async (program, args, options) => {
+    const result = await h.runner(program, args, options);
+    if (program === 'bw' && args[1] === 'config') {
+      await writeFile(join(options.env.BITWARDENCLI_APPDATA_DIR!, 'data.json'), 'invalid JSON');
+    }
+    return result;
+  };
+  try {
+    await writeFile(join(h.config.outputDir, 'backup.kdbx'), 'previous backup');
+    await assert.rejects(backup(h.config, { runner, tempRoot: h.dir, requireTmpfs: false }), /device identity/);
+    assert.deepEqual(h.calls, ['config']);
+    assert.equal(await readFile(join(h.config.outputDir, 'backup.kdbx'), 'utf8'), 'previous backup');
+    assert.deepEqual(await readdir(h.dir), ['output']);
+  } finally { await rm(h.dir, { recursive: true, force: true }); }
+});
+
 for (const backupPassword of ['backup-secret', '']) {
   test(`one-shot pipeline syncs, exports, downloads, verifies, atomically replaces and cleans up (${backupPassword ? 'password' : 'empty password'})`, async () => {
     const h = await harness();
@@ -103,6 +155,7 @@ test('verified backups receive the configured permissions, including modes witho
 for (const failAt of ['login', 'unlock', 'sync', 'get', 'import', 'attachment-export']) {
   test(`failure at ${failAt} preserves the last backup and sanitizes diagnostics`, async () => {
     const h = await harness(failAt);
+    h.config.deviceIdentifier = 'abcdef01-2345-4678-9abc-def012345678';
     try {
       await writeFile(join(h.config.outputDir, 'backup.kdbx'), 'previous backup');
       await assert.rejects(backup(h.config, { runner: h.runner, tempRoot: h.dir, requireTmpfs: false }), error => {
